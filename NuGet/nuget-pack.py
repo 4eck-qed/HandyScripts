@@ -79,7 +79,13 @@ def pack(input_dir: str, output_dir: str, version_map: dict[str, str] = None, st
             pack(path, output_dir, version_map, static_version)
             continue
 
-        file_name, file_extension = item.rsplit('.', 1)
+        file_parts = item.rsplit('.', 1)
+
+        # ignore extension-less files rightaway
+        if len(file_parts) < 2:
+            continue
+
+        file_name, file_extension = file_parts
 
         if static_version is not None:
             version = static_version
