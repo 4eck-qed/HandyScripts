@@ -1,4 +1,4 @@
-## nuget-pack.py
+## <a href=nuget-pack.py> nuget-pack.py </a>
 Recursively iterates through given directory and generates a nuget package for every project. \
 The nuget package file is then moved to a given output directory.
 
