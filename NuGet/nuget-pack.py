@@ -1,7 +1,9 @@
 from argparse import ArgumentParser, Namespace
+from fnmatch import fnmatch
 import os
 import shutil
 import re
+from typing import List, Optional
 import packaging.version as pv
 
 project_files = [
@@ -70,13 +72,21 @@ def gather_versions(dir: str) -> dict[str, str]:
     return version_map
 
 
-def pack(input_dir: str, output_dir: str, version_map: dict[str, str] = None, static_version: str = None) -> None:
+def matches_any(arg: str, patterns: List[str]) -> bool:
+    for pattern in patterns:
+        if fnmatch(arg, pattern):
+            return True
+
+    return False
+
+
+def pack(input_dir: str, output_dir: str, version_map: Optional[dict[str, str]] = None, static_version: Optional[str] = None, ignore: Optional[List[str]] = None) -> None:
     for item in os.listdir(input_dir):
         path = os.path.join(input_dir, item)
 
         if os.path.isdir(path):
             # Recurse
-            pack(path, output_dir, version_map, static_version)
+            pack(path, output_dir, version_map, static_version, ignore)
             continue
 
         file_parts = item.rsplit('.', 1)
@@ -86,6 +96,9 @@ def pack(input_dir: str, output_dir: str, version_map: dict[str, str] = None, st
             continue
 
         file_name, file_extension = file_parts
+
+        if ignore and matches_any(file_name, ignore):
+            continue
 
         if static_version is not None:
             version = static_version
@@ -110,14 +123,20 @@ def pack(input_dir: str, output_dir: str, version_map: dict[str, str] = None, st
 def main(args: Namespace):
     input_dir = args.input_dir
     output_dir = args.output_dir
+    ignore = list()
+    if args.ignore:
+        for entry in str(args.ignore).split(","):
+            ignore.append(entry.strip())
 
     if args.version:
-        pack(input_dir, output_dir, static_version=args.version)
+        pack(input_dir, output_dir, static_version=args.version, ignore=ignore)
 
     elif args.autoversion:
         increment = "0.0.1" if not args.autoversion_increment else args.autoversion_increment
-        pack(input_dir, output_dir, version_map=increment_versions(gather_versions(output_dir), increment))
-    
+        old_versions = gather_versions(output_dir)
+        pack(input_dir, output_dir, ignore=ignore,
+             version_map=increment_versions(old_versions, increment))
+
     print("\n>> Done")
 
 
@@ -138,5 +157,8 @@ if __name__ == "__main__":
 
     parser.add_argument("-v", "--version", type=str,
                         help="Version number of the generated packages.")
+
+    parser.add_argument("-ig", "--ignore", type=str,
+                        help="Which projects shall be ignored (Specify as comma separated values) >> Supports wildcards! <<")
 
     main(parser.parse_args())
