@@ -6,6 +6,8 @@ import re
 from typing import List, Optional
 import packaging.version as pv
 
+from NuGet.helpers import versiontool as vt
+
 project_files = [
     "csproj",          # - C#
     "vbproj",          # - Visual Basic
@@ -17,59 +19,6 @@ project_files = [
     "sqlproj",         # - SQL Server
     "shproj",          # - Shared
 ]
-
-
-def increment_version(version: str, increment: str) -> str:
-    version_components = version.split('.')
-    increment_components = increment.split('.')
-
-    # pad the version and increment components with zeros if needed
-    while len(version_components) < len(increment_components):
-        version_components.append('0')
-    while len(version_components) > len(increment_components):
-        increment_components.append('0')
-
-    # add the corresponding components of the two version numbers
-    new_version_components = []
-    for i in range(len(version_components)):
-        new_version_components.append(
-            str(int(version_components[i]) + int(increment_components[i])))
-
-    # join the components into a new version number
-    new_version = '.'.join(new_version_components)
-
-    return new_version
-
-
-def increment_versions(version_map: dict[str, str], increment: str) -> dict[str, str]:
-    for name, version in version_map.items():
-        version_map[name] = increment_version(version, increment)
-
-    return version_map
-
-
-def gather_versions(dir: str) -> dict[str, str]:
-    version_map = {}
-
-    for file_name in os.listdir(dir):
-        file_path = os.path.join(dir, file_name)
-
-        if os.path.isfile(file_path) and file_name.endswith('.nupkg'):
-            pattern = r"(?P<name>.+)\.(?P<version>\d+\.\d+\.\d+)\.(?P<extension>.+)"
-            match = re.match(pattern, file_name)
-
-            if not match:
-                continue
-
-            name = match.group("name")
-            version = match.group("version")
-
-            if name in version_map and pv.Version(version) <= pv.Version(version_map[name]):
-                continue
-
-            version_map[name] = version
-
-    return version_map
 
 
 def matches_any(arg: str, patterns: List[str]) -> bool:
@@ -133,9 +82,9 @@ def main(args: Namespace):
 
     elif args.autoversion:
         increment = "0.0.1" if not args.autoversion_increment else args.autoversion_increment
-        old_versions = gather_versions(output_dir)
-        pack(input_dir, output_dir, ignore=ignore,
-             version_map=increment_versions(old_versions, increment))
+        cur_versions = vt.get_latest(output_dir)
+        incr_versions = vt.increment_versions(cur_versions, increment)
+        pack(input_dir, output_dir, ignore=ignore, version_map=incr_versions)
 
     print("\n>> Done")
 
